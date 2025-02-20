@@ -1,0 +1,13 @@
+plugin: aws_ec2
+aws_profile: default
+regions:
+  - ap-southeast-1
+
+hostnames:
+  - ip-address
+groups:
+  jenkins: '"jenkins-Server" in tags.Name'
+  docker: '"docker-Server" in tags.Name'
+  sonarqube: '"sonarqube-Server" in tags.Name'
+
+    

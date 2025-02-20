@@ -1,0 +1,7 @@
+- name: Install application based on group
+  hosts: all
+  become: true
+  roles:
+    - { role: "docker", when: "'docker' in group_names" }
+    - { role: "jenkins", when: "'jenkins' in group_names" }
+    - { role: "sonarqube", when: "'sonarqube' in group_names" }

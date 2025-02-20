@@ -1,0 +1,6 @@
+jenkins_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
+jenkins_key_path: "/usr/share/keyrings/jenkins-keyring.asc"
+jenkins_repo: "deb [signed-by={{ jenkins_key_path }}] https://pkg.jenkins.io/debian-stable binary/"
+jenkins_repo_path: "/etc/apt/sources.list.d/jenkins.list"
+jenkins_package: "jenkins"
+java_package: "openjdk-17-jre"

@@ -1,0 +1,200 @@
+- name: Update package cache
+  ansible.builtin.apt:
+    update_cache: true
+    force_apt_get: true
+  become: true
+
+- name: Install ca-certificates
+  ansible.builtin.apt:
+    name: ca-certificates
+    state: present
+    update_cache: true
+
+- name: Create folder /usr/share/postgresql-common/pgdg
+  ansible.builtin.file:
+    path: /usr/share/postgresql-common/pgdg
+    state: directory
+    mode: '0755'
+
+- name: Get key PostgreSQL
+  ansible.builtin.get_url:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    dest: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+    mode: '0644'
+    force: true
+
+- name: Ensure PostgreSQL repository configuration file is present
+  ansible.builtin.lineinfile:
+    path: /etc/apt/sources.list.d/pgdg.list
+    line: "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt focal-pgdg main"
+    create: true
+    mode: '0644'
+  become: true
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install the latest version of PostgreSQL
+  ansible.builtin.apt:
+    name:
+      - postgresql-{{ postgresql_version }}
+      - python3-psycopg2
+    state: present
+    update_cache: true
+
+- name: Add postgres user to sudoers
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers
+    line: 'postgres ALL=(ALL) NOPASSWD: ALL'
+    validate: '/usr/sbin/visudo -cf %s'
+
+
+- name: Ensure the PosstgreSQL service is running
+  ansible.builtin.service:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Create Sonarqube user if not exists
+  become: true
+  ansible.builtin.shell: |
+    sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ postgresql_user }}'" | grep -q 1 || sudo -u postgres psql -c "CREATE USER {{ postgresql_user }} WITH PASSWORD '{{ postgresql_password }}';"
+  args:
+    executable: /bin/bash
+
+- name: Create Sonarqube database if not exists
+  become: true
+  ansible.builtin.shell: |
+    sudo -u postgres psql -c "SELECT 1 FROM pg_database WHERE datname = '{{ postgresql_database }}' LIMIT 1;" | grep -q 1 || sudo -u postgres psql -c 'CREATE DATABASE {{ postgresql_database }} OWNER {{ postgresql_user }};'
+  args:
+    executable: /bin/bash
+
+- name: Create SonarQube user
+  ansible.builtin.user:
+    name: "{{ sonarqube_user }}"
+  become: true
+
+- name: Installing the java version 17
+  ansible.builtin.apt:
+    name: "{{ java_version }}"
+
+- name: ADDING LINES to /etc/sysctl.conf
+  ansible.builtin.lineinfile:
+    dest: /etc/sysctl.conf
+    line: '{{ item }}'
+  with_items:
+    - 'vm.max_map_count=524288'
+    - 'fs.file-max=131072'
+
+- name: Reload system changes
+  ansible.builtin.command: sysctl --system
+  become: true
+  changed_when: false
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - unzip
+      - software-properties-common
+      - wget
+    state: present
+  become: true
+
+- name: Download Sonarqube
+  ansible.builtin.get_url:
+    url: "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-{{ sonarqube_version }}.zip"
+    dest: "/opt/sonarqube-{{ sonarqube_version }}.zip"
+    mode: '0644'
+  become: true
+
+- name: Unarchive Sonarqube
+  ansible.builtin.unarchive:
+    src: "/opt/sonarqube-{{ sonarqube_version }}.zip"
+    dest: "/opt"
+    remote_src: true
+  become: true
+
+
+- name: Rename
+  ansible.builtin.command: mv /opt/sonarqube-{{ sonarqube_version }} /opt/sonarqube
+  become: true
+  changed_when: false
+
+- name: Change file ownership
+  ansible.builtin.file:
+    path: /opt/sonarqube
+    state: directory
+    recurse: true
+    owner: sonarqube
+    group: sonarqube
+
+- name: Reline line  of username
+  ansible.builtin.lineinfile:
+    path: /opt/sonarqube/conf/sonar.properties
+    regex: '^(.*)#sonar.jdbc.username=(.*)$'
+    line: 'sonar.jdbc.username={{ postgresql_user }}'
+    backrefs: true
+
+- name: Reline line  of password
+  ansible.builtin.lineinfile:
+    path: /opt/sonarqube/conf/sonar.properties
+    regex: '^(.*)#sonar.jdbc.password=(.*)$'
+    line: 'sonar.jdbc.password={{ postgresql_password }}'
+    backrefs: true
+
+- name: Reline line  of password
+  ansible.builtin.lineinfile:
+    path: /opt/sonarqube/conf/sonar.properties
+    regex: '^(.*)#sonar.jdbc.=jdbc:postgresql://localhost/sonarqube?(.*)$'
+    line: 'sonar.jdbc.url=jdbc:postgresql://{{ postgresql_host }}:{{ postgresql_port }}/{{ postgresql_database }}'
+    backrefs: true
+
+- name: Reline line  of password
+  ansible.builtin.lineinfile:
+    path: /opt/sonarqube/conf/sonar.properties
+    regex: '^(.*)#sonar.web.host(.*)$'
+    line: 'sonar.web.host=0.0.0.0'
+    backrefs: true
+
+
+- name: Reline line  of password
+  ansible.builtin.lineinfile:
+    path: /opt/sonarqube/conf/sonar.properties
+    regex: '^(.*)#sonar.web.javaAdditionalOpts=-server(.*)$'
+    line: 'sonar.web.javaAdditionalOpts=-server'
+    backrefs: true
+  notify: Restart SonarQube
+
+- name: Create a systemd service file for SonarQube
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/sonarqube.service
+    content: |
+      [Unit]
+      Description=SonarQube service
+      After=syslog.target network.target
+
+      [Service]
+      Type=forking
+      ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh start
+      ExecStop=/opt/sonarqube/bin/linux-x86-64/sonar.sh stop
+      User=sonarqube
+      Group=sonarqube
+      Restart=on-failure
+      LimitNOFILE=65536
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: '0644'
+  notify: 
+    - Reload systemd
+    - Restart SonarQube
+
+- name: Enable SonarQube service to start on boot
+  become: true
+  ansible.builtin.systemd:
+    name: sonarqube
+    enabled: true
+
+

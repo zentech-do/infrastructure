@@ -1,0 +1,31 @@
+# roles/docker_install/tasks/main.yml
+
+- name: Cài đặt các gói phụ thuộc
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+    state: present
+    update_cache: yes
+
+- name: Thêm khóa GPG của Docker
+  shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+  args:
+    executable: /bin/bash
+
+- name: Thêm repository Docker
+  shell: add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  args:
+    executable: /bin/bash
+
+- name: Cập nhật danh sách gói
+  apt:
+    update_cache: yes
+
+- name: Cài đặt Docker với phiên bản {{ docker_version }}
+  apt:
+    name: "{{ docker_packages }}"
+    state: present
+  notify: Start docker

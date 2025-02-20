@@ -1,0 +1,31 @@
+- name: Tải xuống khóa GPG của Jenkins
+  ansible.builtin.get_url:
+    url: "{{ jenkins_key_url }}"
+    dest: "{{ jenkins_key_path }}"
+    mode: '0644'
+  become: true
+
+- name: Thêm kho APT của Jenkins
+  ansible.builtin.apt_repository:
+    repo: "{{ jenkins_repo }}"
+    state: present
+    filename: "{{ jenkins_repo_path | basename }}"
+  become: true
+
+- name: Cập nhật danh sách package
+  ansible.builtin.apt:
+    update_cache: true
+  become: true
+
+- name: Cài đặt OpenJDK 17
+  ansible.builtin.apt:
+    name: "{{ java_package }}"
+    state: present
+  become: true
+
+- name: Cài đặt Jenkins
+  ansible.builtin.apt:
+    name: "{{ jenkins_package }}"
+    state: present
+  become: true
+  notify: Restart Jenkins

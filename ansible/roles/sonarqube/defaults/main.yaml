@@ -1,0 +1,21 @@
+---
+# defaults file for SonarQube role
+
+# PostgreSQL settings
+postgresql_version: "13"
+postgresql_user: "sonarqube"
+postgresql_password: "sonarqube"
+postgresql_database: "sonarqube"
+postgresql_host: "localhost"
+postgresql_port: 5432
+
+# SonarQube settings
+sonarqube_version: "10.4.0.87286"
+sonarqube_install_dir: "/opt/sonarqube"
+sonarqube_user: "sonarqube"
+sonarqube_group: "sonarqube"
+sonarqube_service_name: "sonarqube"
+
+# Java settings
+java_version: "openjdk-17-jdk"
+
