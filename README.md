@@ -71,7 +71,12 @@ python --version
 pip install boto3 ansible boto
 ```
 
-## 🚀 Running the Source Code
+### Create keys ssh and add them in ansible folder
+- jenkins_aws.pem
+- docker_aws.pem
+- sonarqube_aws.pem
+
+ ## 🚀 Running the Source Code
 
 ### Navigate to the Desired Service Directory
 
